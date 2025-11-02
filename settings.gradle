@@ -1,0 +1,2 @@
+rootProject.name = 'Op_nurv_app'
+include ':app'
