@@ -47,19 +47,34 @@ cookieManager.setAcceptThirdPartyCookies(mWebView, true);
 mWebView.setWebViewClient(new HelloWebViewClient());
 mWebView.setWebChromeClient(new android.webkit.WebChromeClient());
 
+        
         mWebView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-            request.setMimeType(mimetype);
-            request.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url));
-            request.addRequestHeader("User-Agent", userAgent);
-            request.setDescription("Downloading file...");
-            request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype));
-            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype));
-            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-            dm.enqueue(request);
-            Toast.makeText(getApplicationContext(), "Downloading File", Toast.LENGTH_LONG).show();
-        });
+    try {
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+        request.setMimeType(mimetype);
+        request.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url));
+        request.addRequestHeader("User-Agent", userAgent);
+        request.setDescription("Downloading file...");
+        String fileName = URLUtil.guessFileName(url, contentDisposition, mimetype);
+        request.setTitle(fileName);
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+
+        // ✅ For Android 10 (API 29) and above
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            request.setDestinationInExternalFilesDir(getApplicationContext(), Environment.DIRECTORY_DOWNLOADS, fileName);
+        } else {
+            // ✅ For Android 9 and below
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+        }
+
+        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        dm.enqueue(request);
+        Toast.makeText(getApplicationContext(), "Downloading " + fileName, Toast.LENGTH_LONG).show();
+    } catch (Exception e) {
+        e.printStackTrace();
+        Toast.makeText(getApplicationContext(), "Download failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+    }
+});
 
         if (isNetworkAvailable()) {
             mWebView.loadUrl("https://x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
