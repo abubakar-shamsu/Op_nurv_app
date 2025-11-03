@@ -30,6 +30,27 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         mWebView = findViewById(R.id.activity_main_webview);
+
+        // Add this after mWebView = findViewById(...)
+mWebView.addJavascriptInterface(new Object() {
+    @android.webkit.JavascriptInterface
+    public void downloadBase64File(String base64Data, String fileName) {
+        try {
+            byte[] fileAsBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT);
+            java.io.File filePath = new java.io.File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName);
+            java.io.FileOutputStream os = new java.io.FileOutputStream(filePath);
+            os.write(fileAsBytes);
+            os.close();
+
+            Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(getApplicationContext(), "Failed to save: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+}, "Android");
+
+        
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
 webSettings.setJavaScriptEnabled(true);
