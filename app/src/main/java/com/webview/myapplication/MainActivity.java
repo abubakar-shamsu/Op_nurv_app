@@ -32,6 +32,17 @@ public class MainActivity extends Activity {
         mWebView = findViewById(R.id.activity_main_webview);
         WebSettings webSettings = mWebView.getSettings();
         webSettings.setJavaScriptEnabled(true);
+webSettings.setDomStorageEnabled(true);
+webSettings.setDatabaseEnabled(true);
+webSettings.setAllowFileAccess(true);
+webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+webSettings.setSupportMultipleWindows(true);
+webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+// Enable cookies
+CookieManager cookieManager = CookieManager.getInstance();
+cookieManager.setAcceptCookie(true);
+cookieManager.setAcceptThirdPartyCookies(mWebView, true);
         mWebView.setWebViewClient(new HelloWebViewClient());
 
         mWebView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
