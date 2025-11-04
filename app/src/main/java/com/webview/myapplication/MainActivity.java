@@ -155,16 +155,26 @@ public class MainActivity extends Activity {
 
             @android.webkit.JavascriptInterface
             public void requestCameraPermission() {
-                ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{android.Manifest.permission.CAMERA},
-                    CAMERA_PERMISSION_REQUEST_CODE);
+                runOnUiThread(() -> {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, 
+                        android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(MainActivity.this,
+                            new String[]{android.Manifest.permission.CAMERA},
+                            CAMERA_PERMISSION_REQUEST_CODE);
+                    }
+                });
             }
 
             @android.webkit.JavascriptInterface
             public void requestMicrophonePermission() {
-                ActivityCompat.requestPermissions(MainActivity.this,
-                    new String[]{android.Manifest.permission.RECORD_AUDIO},
-                    MICROPHONE_PERMISSION_REQUEST_CODE);
+                runOnUiThread(() -> {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, 
+                        android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        ActivityCompat.requestPermissions(MainActivity.this,
+                            new String[]{android.Manifest.permission.RECORD_AUDIO},
+                            MICROPHONE_PERMISSION_REQUEST_CODE);
+                    }
+                });
             }
 
             @android.webkit.JavascriptInterface
@@ -198,10 +208,6 @@ public class MainActivity extends Activity {
         
         // Enable media playback
         webSettings.setMediaPlaybackRequiresUserGesture(false);
-        
-        // Enable camera and microphone for WebRTC
-        webSettings.setAllowFileAccessFromFileURLs(true);
-        webSettings.setAllowUniversalAccessFromFileURLs(true);
 
         // Cookie management
         CookieManager cookieManager = CookieManager.getInstance();
@@ -326,62 +332,33 @@ public class MainActivity extends Activity {
     }
 
     private void requestNecessaryPermissions() {
-        // Check and request camera permission
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) 
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                new String[]{android.Manifest.permission.CAMERA},
-                CAMERA_PERMISSION_REQUEST_CODE);
-        }
+        // Request all necessary permissions at once
+        String[] permissions = new String[]{
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        };
         
-        // Check and request microphone permission  
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) 
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                new String[]{android.Manifest.permission.RECORD_AUDIO},
-                MICROPHONE_PERMISSION_REQUEST_CODE);
-        }
-        
-        // Check and request storage permissions
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) 
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                new String[]{
-                    android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    android.Manifest.permission.READ_EXTERNAL_STORAGE
-                },
-                PERMISSION_REQUEST_CODE);
-        }
+        ActivityCompat.requestPermissions(this, permissions, PERMISSION_REQUEST_CODE);
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
-        switch (requestCode) {
-            case CAMERA_PERMISSION_REQUEST_CODE:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Camera permission granted", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Camera permission denied", Toast.LENGTH_LONG).show();
-                }
+        boolean allGranted = true;
+        for (int result : grantResults) {
+            if (result != PackageManager.PERMISSION_GRANTED) {
+                allGranted = false;
                 break;
-                
-            case MICROPHONE_PERMISSION_REQUEST_CODE:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Microphone permission granted", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Microphone permission denied", Toast.LENGTH_LONG).show();
-                }
-                break;
-                
-            case PERMISSION_REQUEST_CODE:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Storage permissions granted", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, "Storage permissions denied - downloads may not work", Toast.LENGTH_LONG).show();
-                }
-                break;
+            }
+        }
+        
+        if (allGranted) {
+            Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Some permissions were denied - some features may not work", Toast.LENGTH_LONG).show();
         }
         
         // Notify WebView about permission changes
@@ -442,6 +419,8 @@ public class MainActivity extends Activity {
                 "(function() {" +
                 "    // Override download functions to use Android interface" +
                 "    if (typeof window.Android !== 'undefined') {" +
+                "        console.log('Android interface detected, setting up download handlers...');" +
+                "        " +
                 "        // Override conversation download" +
                 "        const originalDownloadConversation = window.downloadConversation;" +
                 "        if (originalDownloadConversation) {" +
@@ -504,11 +483,16 @@ public class MainActivity extends Activity {
                 "        " +
                 "        // Fix Open Full button to use Android interface" +
                 "        document.addEventListener('click', function(e) {" +
-                "            if (e.target.closest('.image-action-btn') && e.target.closest('svg') && " +
-                "                e.target.closest('svg').innerHTML.includes('M20 6L9 17L4 12')) {" +
+                "            const openFullBtn = e.target.closest('.image-action-btn');" +
+                "            if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
                 "                e.preventDefault();" +
-                "                const imageUrl = e.target.closest('.generated-image-container').querySelector('img').src;" +
-                "                window.Android.openInBrowser(imageUrl);" +
+                "                const imageContainer = openFullBtn.closest('.generated-image-container');" +
+                "                if (imageContainer) {" +
+                "                    const img = imageContainer.querySelector('img');" +
+                "                    if (img && img.src) {" +
+                "                        window.Android.openInBrowser(img.src);" +
+                "                    }" +
+                "                }" +
                 "            }" +
                 "        });" +
                 "        " +
@@ -533,17 +517,8 @@ public class MainActivity extends Activity {
                 "                }" +
                 "            });" +
                 "        }" +
-                "        " +
-                "        // Fix for WebView file input issues" +
-                "        const originalCreateElement = document.createElement;" +
-                "        document.createElement = function(tagName) {" +
-                "            const element = originalCreateElement.call(document, tagName);" +
-                "            if (tagName.toLowerCase() === 'input' && element.type === 'file') {" +
-                "                element.setAttribute('accept', 'image/*,audio/*,.pdf,.txt,.html,.css,.js,.py,.doc,.xls,.xlsx,.ppt,.pptx');" +
-                "                element.setAttribute('multiple', 'multiple');" +
-                "            }" +
-                "            return element;" +
-                "        };" +
+                "    } else {" +
+                "        console.log('Android interface not available');" +
                 "    }" +
                 "})();";
             
