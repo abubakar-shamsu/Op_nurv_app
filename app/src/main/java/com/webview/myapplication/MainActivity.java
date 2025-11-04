@@ -280,73 +280,74 @@ public class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
-            // Inject JavaScript to enhance download functionality
-            view.evaluateJavascript("""
-                (function() {
-                    // Override download functions to use Android interface
-                    if (typeof window.Android !== 'undefined') {
-                        // Override conversation download
-                        const originalDownloadConversation = window.downloadConversation;
-                        if (originalDownloadConversation) {
-                            window.downloadConversation = function(conversationId) {
-                                const conversation = window.conversations.find(c => c.id === conversationId);
-                                if (!conversation) return;
-                                
-                                let conversationText = `Nurvle Conversation\\n`;
-                                conversationText += `Title: ${conversation.title || 'Untitled'}\\n`;
-                                conversationText += `Date: ${new Date(conversation.timestamp).toLocaleDateString()}\\n`;
-                                conversationText += `Time: ${new Date(conversation.timestamp).toLocaleTimeString()}\\n`;
-                                conversationText += '='.repeat(50) + '\\n\\n';
-                                
-                                conversation.messages.forEach((message, index) => {
-                                    const isUser = message.role === 'user';
-                                    const sender = isUser ? 'USER' : 'ASSISTANT';
-                                    const content = message.content || '';
-                                    
-                                    if (index > 0) {
-                                        conversationText += '\\n' + '-'.repeat(50) + '\\n\\n';
-                                    }
-                                    
-                                    conversationText += `${sender}:\\n`;
-                                    conversationText += content + '\\n';
-                                    
-                                    if (isUser && message.files && message.files.length > 0) {
-                                        conversationText += '\\nAttachments:\\n';
-                                        message.files.forEach(file => {
-                                            conversationText += `- ${file.name} (${file.type}, ${(file.size / 1024).toFixed(2)} KB)\\n`;
-                                        });
-                                    }
-                                });
-                                
-                                conversationText += '\\n' + '='.repeat(50) + '\\n';
-                                conversationText += 'End of conversation\\n';
-                                
-                                const fileName = `nurvle_conversation_${conversationId}_${Date.now()}.txt`;
-                                window.Android.downloadTextFile(conversationText, fileName);
-                            };
-                        }
-                        
-                        // Override image download
-                        const originalDownloadGeneratedImage = window.downloadGeneratedImage;
-                        if (originalDownloadGeneratedImage) {
-                            window.downloadGeneratedImage = function(imageUrl, prompt) {
-                                const safePrompt = prompt.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);
-                                const fileName = `generated_${safePrompt}_${Date.now()}.png`;
-                                window.Android.downloadImageFromUrl(imageUrl, fileName);
-                            };
-                        }
-                        
-                        // Override response download
-                        const originalDownloadResponse = window.downloadResponse;
-                        if (originalDownloadResponse) {
-                            window.downloadResponse = function(textContent, messageId) {
-                                const fileName = `response_${messageId}_${Date.now()}.txt`;
-                                window.Android.downloadTextFile(textContent, fileName);
-                            };
-                        }
-                    }
-                })();
-            """, null);
+            // Inject JavaScript to enhance download functionality - using regular string concatenation
+            String javascriptCode = 
+                "(function() {" +
+                "    // Override download functions to use Android interface" +
+                "    if (typeof window.Android !== 'undefined') {" +
+                "        // Override conversation download" +
+                "        const originalDownloadConversation = window.downloadConversation;" +
+                "        if (originalDownloadConversation) {" +
+                "            window.downloadConversation = function(conversationId) {" +
+                "                const conversation = window.conversations.find(c => c.id === conversationId);" +
+                "                if (!conversation) return;" +
+                "                " +
+                "                let conversationText = 'Nurvle Conversation\\\\n';" +
+                "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\\\n';" +
+                "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\\\n';" +
+                "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\\\n';" +
+                "                conversationText += '='.repeat(50) + '\\\\n\\\\n';" +
+                "                " +
+                "                conversation.messages.forEach((message, index) => {" +
+                "                    const isUser = message.role === 'user';" +
+                "                    const sender = isUser ? 'USER' : 'ASSISTANT';" +
+                "                    const content = message.content || '';" +
+                "                    " +
+                "                    if (index > 0) {" +
+                "                        conversationText += '\\\\n' + '-'.repeat(50) + '\\\\n\\\\n';" +
+                "                    }" +
+                "                    " +
+                "                    conversationText += sender + ':\\\\n';" +
+                "                    conversationText += content + '\\\\n';" +
+                "                    " +
+                "                    if (isUser && message.files && message.files.length > 0) {" +
+                "                        conversationText += '\\\\nAttachments:\\\\n';" +
+                "                        message.files.forEach(file => {" +
+                "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\\\n';" +
+                "                        });" +
+                "                    }" +
+                "                });" +
+                "                " +
+                "                conversationText += '\\\\n' + '='.repeat(50) + '\\\\n';" +
+                "                conversationText += 'End of conversation\\\\n';" +
+                "                " +
+                "                const fileName = 'nurvle_conversation_' + conversationId + '_' + Date.now() + '.txt';" +
+                "                window.Android.downloadTextFile(conversationText, fileName);" +
+                "            };" +
+                "        }" +
+                "        " +
+                "        // Override image download" +
+                "        const originalDownloadGeneratedImage = window.downloadGeneratedImage;" +
+                "        if (originalDownloadGeneratedImage) {" +
+                "            window.downloadGeneratedImage = function(imageUrl, prompt) {" +
+                "                const safePrompt = prompt.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);" +
+                "                const fileName = 'generated_' + safePrompt + '_' + Date.now() + '.png';" +
+                "                window.Android.downloadImageFromUrl(imageUrl, fileName);" +
+                "            };" +
+                "        }" +
+                "        " +
+                "        // Override response download" +
+                "        const originalDownloadResponse = window.downloadResponse;" +
+                "        if (originalDownloadResponse) {" +
+                "            window.downloadResponse = function(textContent, messageId) {" +
+                "                const fileName = 'response_' + messageId + '_' + Date.now() + '.txt';" +
+                "                window.Android.downloadTextFile(textContent, fileName);" +
+                "            };" +
+                "        }" +
+                "    }" +
+                "})();";
+            
+            view.evaluateJavascript(javascriptCode, null);
         }
     }
 
