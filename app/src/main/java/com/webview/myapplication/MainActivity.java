@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -37,6 +38,11 @@ public class MainActivity extends Activity {
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 101;
     private static final int MICROPHONE_PERMISSION_REQUEST_CODE = 102;
+    
+    // SharedPreferences for tracking permission state
+    private static final String PREFS_NAME = "NurvlePrefs";
+    private static final String PERMISSIONS_GRANTED_KEY = "permissions_granted";
+    private SharedPreferences sharedPreferences;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -45,6 +51,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         mWebView = findViewById(R.id.activity_main_webview);
+        sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
         // Enhanced JavaScript interface for file operations
         mWebView.addJavascriptInterface(new Object() {
@@ -186,8 +193,10 @@ public class MainActivity extends Activity {
 
         }, "Android");
 
-        // Request permissions on app start
-        requestNecessaryPermissions();
+        // Request permissions only if not already granted
+        if (!areAllPermissionsGranted() && !sharedPreferences.getBoolean(PERMISSIONS_GRANTED_KEY, false)) {
+            requestNecessaryPermissions();
+        }
 
         // WebView configuration
         WebSettings webSettings = mWebView.getSettings();
@@ -214,10 +223,10 @@ public class MainActivity extends Activity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(mWebView, true);
 
-        // Enhanced WebView client
+        // Enhanced WebView client with multi-window support
         mWebView.setWebViewClient(new HelloWebViewClient());
         
-        // Enhanced WebChromeClient for file uploads, camera, microphone, and other Chrome features
+        // Enhanced WebChromeClient for multi-window, file uploads, camera, microphone
         mWebView.setWebChromeClient(new WebChromeClient() {
             // For file upload support
             @Override
@@ -261,6 +270,48 @@ public class MainActivity extends Activity {
                             break;
                     }
                 }
+            }
+            
+            // Handle new window creation (multi-window support)
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                // Create a new WebView for the popup
+                WebView newWebView = new WebView(MainActivity.this);
+                WebSettings webSettings = newWebView.getSettings();
+                webSettings.setJavaScriptEnabled(true);
+                webSettings.setDomStorageEnabled(true);
+                webSettings.setAllowFileAccess(true);
+                webSettings.setAllowContentAccess(true);
+                
+                // Set up the new WebView
+                newWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                        // Handle external URLs in browser
+                        if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
+                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                            startActivity(intent);
+                            return true;
+                        }
+                        // Load internal URLs in the same WebView
+                        view.loadUrl(url);
+                        return true;
+                    }
+                });
+                
+                // Add the new WebView to the layout (you might want to use a proper container)
+                // For now, we'll open external links in browser and internal links in main WebView
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(mWebView); // Use main WebView for internal links
+                resultMsg.sendToTarget();
+                return true;
+            }
+            
+            // Handle window closing
+            @Override
+            public void onCloseWindow(WebView window) {
+                super.onCloseWindow(window);
+                // Handle window closing if needed
             }
         });
 
@@ -331,6 +382,22 @@ public class MainActivity extends Activity {
         }
     }
 
+    private boolean areAllPermissionsGranted() {
+        String[] permissions = new String[]{
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
+            android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        };
+        
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void requestNecessaryPermissions() {
         // Request all necessary permissions at once
         String[] permissions = new String[]{
@@ -347,18 +414,25 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         
-        boolean allGranted = true;
-        for (int result : grantResults) {
-            if (result != PackageManager.PERMISSION_GRANTED) {
-                allGranted = false;
-                break;
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
             }
-        }
-        
-        if (allGranted) {
-            Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "Some permissions were denied - some features may not work", Toast.LENGTH_LONG).show();
+            
+            if (allGranted) {
+                // Only show toast if this is the first time permissions are granted
+                if (!sharedPreferences.getBoolean(PERMISSIONS_GRANTED_KEY, false)) {
+                    Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show();
+                    // Save that permissions have been granted
+                    sharedPreferences.edit().putBoolean(PERMISSIONS_GRANTED_KEY, true).apply();
+                }
+            } else {
+                Toast.makeText(this, "Some permissions were denied - some features may not work", Toast.LENGTH_LONG).show();
+            }
         }
         
         // Notify WebView about permission changes
@@ -399,13 +473,21 @@ public class MainActivity extends Activity {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
             String url = request.getUrl().toString();
-            // Handle external URLs in browser, internal URLs in WebView
+            
+            // Handle external URLs in browser
             if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
-                // Open external links in browser
                 Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                 view.getContext().startActivity(intent);
                 return true;
             }
+            
+            // Handle tel:, mailto:, sms: etc.
+            if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("sms:") || url.startsWith("whatsapp:")) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                view.getContext().startActivity(intent);
+                return true;
+            }
+            
             // Load internal URLs in WebView
             view.loadUrl(url);
             return true;
