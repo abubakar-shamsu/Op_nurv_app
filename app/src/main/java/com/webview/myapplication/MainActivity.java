@@ -271,7 +271,7 @@ public class MainActivity extends Activity {
             }
         });
         
-        // Enhanced WebChromeClient for file uploads, camera, microphone
+        // Enhanced WebChromeClient for file uploads, camera, microphone, and window handling
         mWebView.setWebChromeClient(new WebChromeClient() {
             // For file upload support
             @Override
@@ -317,13 +317,20 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Simple multi-window support - block popups by default
+            // Handle new windows - for openFullBtn functionality
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
-                // For safety, we'll block popups by default
-                // If you want to handle popups, you can create a new WebView here
-                // But for now, we'll prevent crashes by not creating new windows
-                Log.d(TAG, "Popup window blocked");
+                // Get the URL that's trying to open in new window
+                WebView.HitTestResult result = view.getHitTestResult();
+                String url = result.getExtra();
+                
+                if (url != null && !url.isEmpty()) {
+                    Log.d(TAG, "Opening URL in same WebView: " + url);
+                    // Load the URL in the same WebView instead of new window
+                    view.loadUrl(url);
+                }
+                
+                // We don't create a new window, so return false
                 return false;
             }
         });
@@ -462,20 +469,46 @@ public class MainActivity extends Activity {
             "            };" +
             "        }" +
             "        " +
-            "        // Fix Open Full button to use Android interface" +
-            "        document.addEventListener('click', function(e) {" +
-            "            const openFullBtn = e.target.closest('.image-action-btn');" +
-            "            if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
-            "                e.preventDefault();" +
-            "                const imageContainer = openFullBtn.closest('.generated-image-container');" +
-            "                if (imageContainer) {" +
-            "                    const img = imageContainer.querySelector('img');" +
-            "                    if (img && img.src) {" +
-            "                        window.Android.openInBrowser(img.src);" +
+            "        // Fix Open Full button to open in same WebView instead of new window" +
+            "        const overrideWindowOpen = function() {" +
+            "            const originalWindowOpen = window.open;" +
+            "            window.open = function(url, name, specs, replace) {" +
+            "                console.log('window.open called with URL:', url);" +
+            "                " +
+            "                // If it's an image URL from openFullBtn, load it in the same WebView" +
+            "                if (url && (url.includes('.png') || url.includes('.jpg') || url.includes('.jpeg') || url.includes('.gif') || url.includes('.webp'))) {" +
+            "                    console.log('Image URL detected, loading in same WebView:', url);" +
+            "                    window.location.href = url;" +
+            "                    return window;" +
+            "                }" +
+            "                " +
+            "                // For other URLs, use the original behavior" +
+            "                return originalWindowOpen.call(window, url, name, specs, replace);" +
+            "            };" +
+            "        };" +
+            "        " +
+            "        // Override the openFullBtn click handler" +
+            "        const overrideOpenFullButton = function() {" +
+            "            document.addEventListener('click', function(e) {" +
+            "                const openFullBtn = e.target.closest('.image-action-btn');" +
+            "                if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
+            "                    e.preventDefault();" +
+            "                    e.stopPropagation();" +
+            "                    const imageContainer = openFullBtn.closest('.generated-image-container');" +
+            "                    if (imageContainer) {" +
+            "                        const img = imageContainer.querySelector('img');" +
+            "                        if (img && img.src) {" +
+            "                            console.log('Open Full button clicked, loading image in same WebView:', img.src);" +
+            "                            window.location.href = img.src;" +
+            "                        }" +
             "                    }" +
             "                }" +
-            "            }" +
-            "        });" +
+            "            });" +
+            "        };" +
+            "        " +
+            "        // Run the overrides" +
+            "        overrideWindowOpen();" +
+            "        overrideOpenFullButton();" +
             "        " +
             "        // Enhanced camera button functionality" +
             "        const cameraBtn = document.getElementById('camera-btn');" +
