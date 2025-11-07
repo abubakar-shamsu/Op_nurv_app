@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Base64;
+import android.util.Log;
 import android.webkit.CookieManager;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
@@ -43,6 +44,8 @@ public class MainActivity extends Activity {
     private static final String PREFS_NAME = "NurvlePrefs";
     private static final String PERMISSIONS_GRANTED_KEY = "permissions_granted";
     private SharedPreferences sharedPreferences;
+    
+    private static final String TAG = "NurvleApp";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -223,10 +226,52 @@ public class MainActivity extends Activity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(mWebView, true);
 
-        // Enhanced WebView client with multi-window support
-        mWebView.setWebViewClient(new HelloWebViewClient());
+        // Enhanced WebView client with proper link handling
+        mWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                Log.d(TAG, "Loading URL: " + url);
+                
+                // Handle external URLs in browser
+                if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error opening URL in browser: " + e.getMessage());
+                        // If browser fails, load in WebView
+                        view.loadUrl(url);
+                        return true;
+                    }
+                }
+                
+                // Handle tel:, mailto:, sms: etc.
+                if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("sms:") || url.startsWith("whatsapp:")) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error opening system intent: " + e.getMessage());
+                        return true;
+                    }
+                }
+                
+                // Load internal URLs in WebView
+                return false;
+            }
+            
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                Log.d(TAG, "Page finished loading: " + url);
+                injectJavaScript();
+            }
+        });
         
-        // Enhanced WebChromeClient for multi-window, file uploads, camera, microphone
+        // Enhanced WebChromeClient for file uploads, camera, microphone
         mWebView.setWebChromeClient(new WebChromeClient() {
             // For file upload support
             @Override
@@ -272,46 +317,14 @@ public class MainActivity extends Activity {
                 }
             }
             
-            // Handle new window creation (multi-window support)
+            // Simple multi-window support - block popups by default
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
-                // Create a new WebView for the popup
-                WebView newWebView = new WebView(MainActivity.this);
-                WebSettings webSettings = newWebView.getSettings();
-                webSettings.setJavaScriptEnabled(true);
-                webSettings.setDomStorageEnabled(true);
-                webSettings.setAllowFileAccess(true);
-                webSettings.setAllowContentAccess(true);
-                
-                // Set up the new WebView
-                newWebView.setWebViewClient(new WebViewClient() {
-                    @Override
-                    public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                        // Handle external URLs in browser
-                        if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
-                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                            startActivity(intent);
-                            return true;
-                        }
-                        // Load internal URLs in the same WebView
-                        view.loadUrl(url);
-                        return true;
-                    }
-                });
-                
-                // Add the new WebView to the layout (you might want to use a proper container)
-                // For now, we'll open external links in browser and internal links in main WebView
-                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-                transport.setWebView(mWebView); // Use main WebView for internal links
-                resultMsg.sendToTarget();
-                return true;
-            }
-            
-            // Handle window closing
-            @Override
-            public void onCloseWindow(WebView window) {
-                super.onCloseWindow(window);
-                // Handle window closing if needed
+                // For safety, we'll block popups by default
+                // If you want to handle popups, you can create a new WebView here
+                // But for now, we'll prevent crashes by not creating new windows
+                Log.d(TAG, "Popup window blocked");
+                return false;
             }
         });
 
@@ -380,6 +393,117 @@ public class MainActivity extends Activity {
         if (connectivityManager != null) {
             connectivityManager.registerDefaultNetworkCallback(networkCallback);
         }
+    }
+
+    private void injectJavaScript() {
+        String javascriptCode = 
+            "(function() {" +
+            "    // Override download functions to use Android interface" +
+            "    if (typeof window.Android !== 'undefined') {" +
+            "        console.log('Android interface detected, setting up download handlers...');" +
+            "        " +
+            "        // Override conversation download" +
+            "        const originalDownloadConversation = window.downloadConversation;" +
+            "        if (originalDownloadConversation) {" +
+            "            window.downloadConversation = function(conversationId) {" +
+            "                const conversation = window.conversations.find(c => c.id === conversationId);" +
+            "                if (!conversation) return;" +
+            "                " +
+            "                let conversationText = 'Nurvle Conversation\\\\n';" +
+            "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\\\n';" +
+            "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\\\n';" +
+            "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\\\n';" +
+            "                conversationText += '='.repeat(50) + '\\\\n\\\\n';" +
+            "                " +
+            "                conversation.messages.forEach((message, index) => {" +
+            "                    const isUser = message.role === 'user';" +
+            "                    const sender = isUser ? 'USER' : 'ASSISTANT';" +
+            "                    const content = message.content || '';" +
+            "                    " +
+            "                    if (index > 0) {" +
+            "                        conversationText += '\\\\n' + '-'.repeat(50) + '\\\\n\\\\n';" +
+            "                    }" +
+            "                    " +
+            "                    conversationText += sender + ':\\\\n';" +
+            "                    conversationText += content + '\\\\n';" +
+            "                    " +
+            "                    if (isUser && message.files && message.files.length > 0) {" +
+            "                        conversationText += '\\\\nAttachments:\\\\n';" +
+            "                        message.files.forEach(file => {" +
+            "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\\\n';" +
+            "                        });" +
+            "                    }" +
+            "                });" +
+            "                " +
+            "                conversationText += '\\\\n' + '='.repeat(50) + '\\\\n';" +
+            "                conversationText += 'End of conversation\\\\n';" +
+            "                " +
+            "                const fileName = 'nurvle_conversation_' + conversationId + '_' + Date.now() + '.txt';" +
+            "                window.Android.downloadTextFile(conversationText, fileName);" +
+            "            };" +
+            "        }" +
+            "        " +
+            "        // Override image download" +
+            "        const originalDownloadGeneratedImage = window.downloadGeneratedImage;" +
+            "        if (originalDownloadGeneratedImage) {" +
+            "            window.downloadGeneratedImage = function(imageUrl, prompt) {" +
+            "                const safePrompt = prompt.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);" +
+            "                const fileName = 'generated_' + safePrompt + '_' + Date.now() + '.png';" +
+            "                window.Android.downloadImageFromUrl(imageUrl, fileName);" +
+            "            };" +
+            "        }" +
+            "        " +
+            "        // Override response download" +
+            "        const originalDownloadResponse = window.downloadResponse;" +
+            "        if (originalDownloadResponse) {" +
+            "            window.downloadResponse = function(textContent, messageId) {" +
+            "                const fileName = 'response_' + messageId + '_' + Date.now() + '.txt';" +
+            "                window.Android.downloadTextFile(textContent, fileName);" +
+            "            };" +
+            "        }" +
+            "        " +
+            "        // Fix Open Full button to use Android interface" +
+            "        document.addEventListener('click', function(e) {" +
+            "            const openFullBtn = e.target.closest('.image-action-btn');" +
+            "            if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
+            "                e.preventDefault();" +
+            "                const imageContainer = openFullBtn.closest('.generated-image-container');" +
+            "                if (imageContainer) {" +
+            "                    const img = imageContainer.querySelector('img');" +
+            "                    if (img && img.src) {" +
+            "                        window.Android.openInBrowser(img.src);" +
+            "                    }" +
+            "                }" +
+            "            }" +
+            "        });" +
+            "        " +
+            "        // Enhanced camera button functionality" +
+            "        const cameraBtn = document.getElementById('camera-btn');" +
+            "        if (cameraBtn) {" +
+            "            cameraBtn.addEventListener('click', function() {" +
+            "                if (!window.Android.hasCameraPermission()) {" +
+            "                    window.Android.requestCameraPermission();" +
+            "                    window.Android.showToast('Camera permission required');" +
+            "                }" +
+            "            });" +
+            "        }" +
+            "        " +
+            "        // Enhanced microphone button functionality" +
+            "        const micBtn = document.getElementById('mic-btn');" +
+            "        if (micBtn) {" +
+            "            micBtn.addEventListener('click', function() {" +
+            "                if (!window.Android.hasMicrophonePermission()) {" +
+            "                    window.Android.requestMicrophonePermission();" +
+            "                    window.Android.showToast('Microphone permission required');" +
+            "                }" +
+            "            });" +
+            "        }" +
+            "    } else {" +
+            "        console.log('Android interface not available');" +
+            "    }" +
+            "})();";
+        
+        mWebView.evaluateJavascript(javascriptCode, null);
     }
 
     private boolean areAllPermissionsGranted() {
@@ -467,145 +591,6 @@ public class MainActivity extends Activity {
                actNw.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || 
                actNw.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) || 
                actNw.hasTransport(NetworkCapabilities.TRANSPORT_VPN));
-    }
-
-    private static class HelloWebViewClient extends WebViewClient {
-        @Override
-        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-            String url = request.getUrl().toString();
-            
-            // Handle external URLs in browser
-            if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                view.getContext().startActivity(intent);
-                return true;
-            }
-            
-            // Handle tel:, mailto:, sms: etc.
-            if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("sms:") || url.startsWith("whatsapp:")) {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                view.getContext().startActivity(intent);
-                return true;
-            }
-            
-            // Load internal URLs in WebView
-            view.loadUrl(url);
-            return true;
-        }
-        
-        @Override
-        public void onPageFinished(WebView view, String url) {
-            super.onPageFinished(view, url);
-            // Inject JavaScript to enhance download functionality and fix WebView compatibility
-            String javascriptCode = 
-                "(function() {" +
-                "    // Override download functions to use Android interface" +
-                "    if (typeof window.Android !== 'undefined') {" +
-                "        console.log('Android interface detected, setting up download handlers...');" +
-                "        " +
-                "        // Override conversation download" +
-                "        const originalDownloadConversation = window.downloadConversation;" +
-                "        if (originalDownloadConversation) {" +
-                "            window.downloadConversation = function(conversationId) {" +
-                "                const conversation = window.conversations.find(c => c.id === conversationId);" +
-                "                if (!conversation) return;" +
-                "                " +
-                "                let conversationText = 'Nurvle Conversation\\\\n';" +
-                "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\\\n';" +
-                "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\\\n';" +
-                "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\\\n';" +
-                "                conversationText += '='.repeat(50) + '\\\\n\\\\n';" +
-                "                " +
-                "                conversation.messages.forEach((message, index) => {" +
-                "                    const isUser = message.role === 'user';" +
-                "                    const sender = isUser ? 'USER' : 'ASSISTANT';" +
-                "                    const content = message.content || '';" +
-                "                    " +
-                "                    if (index > 0) {" +
-                "                        conversationText += '\\\\n' + '-'.repeat(50) + '\\\\n\\\\n';" +
-                "                    }" +
-                "                    " +
-                "                    conversationText += sender + ':\\\\n';" +
-                "                    conversationText += content + '\\\\n';" +
-                "                    " +
-                "                    if (isUser && message.files && message.files.length > 0) {" +
-                "                        conversationText += '\\\\nAttachments:\\\\n';" +
-                "                        message.files.forEach(file => {" +
-                "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\\\n';" +
-                "                        });" +
-                "                    }" +
-                "                });" +
-                "                " +
-                "                conversationText += '\\\\n' + '='.repeat(50) + '\\\\n';" +
-                "                conversationText += 'End of conversation\\\\n';" +
-                "                " +
-                "                const fileName = 'nurvle_conversation_' + conversationId + '_' + Date.now() + '.txt';" +
-                "                window.Android.downloadTextFile(conversationText, fileName);" +
-                "            };" +
-                "        }" +
-                "        " +
-                "        // Override image download" +
-                "        const originalDownloadGeneratedImage = window.downloadGeneratedImage;" +
-                "        if (originalDownloadGeneratedImage) {" +
-                "            window.downloadGeneratedImage = function(imageUrl, prompt) {" +
-                "                const safePrompt = prompt.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 30);" +
-                "                const fileName = 'generated_' + safePrompt + '_' + Date.now() + '.png';" +
-                "                window.Android.downloadImageFromUrl(imageUrl, fileName);" +
-                "            };" +
-                "        }" +
-                "        " +
-                "        // Override response download" +
-                "        const originalDownloadResponse = window.downloadResponse;" +
-                "        if (originalDownloadResponse) {" +
-                "            window.downloadResponse = function(textContent, messageId) {" +
-                "                const fileName = 'response_' + messageId + '_' + Date.now() + '.txt';" +
-                "                window.Android.downloadTextFile(textContent, fileName);" +
-                "            };" +
-                "        }" +
-                "        " +
-                "        // Fix Open Full button to use Android interface" +
-                "        document.addEventListener('click', function(e) {" +
-                "            const openFullBtn = e.target.closest('.image-action-btn');" +
-                "            if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
-                "                e.preventDefault();" +
-                "                const imageContainer = openFullBtn.closest('.generated-image-container');" +
-                "                if (imageContainer) {" +
-                "                    const img = imageContainer.querySelector('img');" +
-                "                    if (img && img.src) {" +
-                "                        window.Android.openInBrowser(img.src);" +
-                "                    }" +
-                "                }" +
-                "            }" +
-                "        });" +
-                "        " +
-                "        // Enhanced camera button functionality" +
-                "        const cameraBtn = document.getElementById('camera-btn');" +
-                "        if (cameraBtn) {" +
-                "            cameraBtn.addEventListener('click', function() {" +
-                "                if (!window.Android.hasCameraPermission()) {" +
-                "                    window.Android.requestCameraPermission();" +
-                "                    window.Android.showToast('Camera permission required');" +
-                "                }" +
-                "            });" +
-                "        }" +
-                "        " +
-                "        // Enhanced microphone button functionality" +
-                "        const micBtn = document.getElementById('mic-btn');" +
-                "        if (micBtn) {" +
-                "            micBtn.addEventListener('click', function() {" +
-                "                if (!window.Android.hasMicrophonePermission()) {" +
-                "                    window.Android.requestMicrophonePermission();" +
-                "                    window.Android.showToast('Microphone permission required');" +
-                "                }" +
-                "            });" +
-                "        }" +
-                "    } else {" +
-                "        console.log('Android interface not available');" +
-                "    }" +
-                "})();";
-            
-            view.evaluateJavascript(javascriptCode, null);
-        }
     }
 
     @Override
