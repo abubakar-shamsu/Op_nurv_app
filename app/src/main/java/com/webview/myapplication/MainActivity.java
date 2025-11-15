@@ -369,7 +369,7 @@ public class MainActivity extends Activity {
 
         // Load URL based on network availability
         if (isNetworkAvailable()) {
-            mWebView.loadUrl("https://x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+            mWebView.loadUrl("https://n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
         } else {
             mWebView.loadUrl("file:///android_asset/offline.html");
         }
@@ -381,7 +381,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     String currentUrl = mWebView.getUrl();
                     if (currentUrl != null && currentUrl.startsWith("file:///android_asset")) {
-                        mWebView.loadUrl("https://x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+                        mWebView.loadUrl("https://n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
                     }
                 });
             }
