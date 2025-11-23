@@ -3,7 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # Allows manual trigger from Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,16 +19,33 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # Decode and place your permanent keystore
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $HOME/my-release-key.jks
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: List available tasks (for debugging)
-        run: ./gradlew tasks --all
+      # Optional: see what tasks are available
+      # - name: List tasks
+      #   run: ./gradlew tasks --all
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build & Sign Debug APK with Permanent Key
+        env:
+          KEYSTORE_PATH: $HOME/my-release-key.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleDebug \
+            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD \
+            --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
