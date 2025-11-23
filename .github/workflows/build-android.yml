@@ -19,29 +19,37 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # ←←← FIXED PART STARTS HERE
-      - name: Decode Keystore
+      - name: Decode Keystore (with safety checks)
         run: |
-          mkdir -p $HOME/keystores
-          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $HOME/keystores/my-release-key.jks
+          echo "Checking required secrets..."
+          test -n "${{ secrets.SIGNING_KEY_BASE64 }}" || { echo "ERROR: SIGNING_KEY_BASE64 missing"; exit 1; }
+          test -n "${{ secrets.KEYSTORE_PASSWORD }}" || { echo "ERROR: KEYSTORE_PASSWORD missing"; exit 1; }
+          test -n "${{ secrets.KEY_ALIAS }}" || { echo "ERROR: KEY_ALIAS missing"; exit 1; }
+          test -n "${{ secrets.KEY_PASSWORD }}" || { echo "ERROR: KEY_PASSWORD missing"; exit 1; }
 
-      - name: Build & Sign Debug APK with Permanent Key
+          mkdir -p ~/keystores
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > ~/keystores/my-release-key.jks
+          echo "Keystore decoded successfully"
+
+      # ←←← THIS LINE WAS MISSING BEFORE
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build & Sign Debug APK
         env:
-          # Use an absolute path that definitely exists and doesn’t contain $HOME
           KEYSTORE_PATH: /home/runner/keystores/my-release-key.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           ./gradlew clean assembleDebug \
-            -Pandroid.injected.signing.store.file="${KEYSTORE_PATH}" \
-            -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
-            -Pandroid.injected.signing.key.alias="${KEY_ALIAS}" \
-            -Pandroid.injected.signing.key.password="${KEY_PASSWORD}" \
+            -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
             --stacktrace
-      # ←←← FIXED PART ENDS HERE
 
-      - name: Upload Signed APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug.apk
