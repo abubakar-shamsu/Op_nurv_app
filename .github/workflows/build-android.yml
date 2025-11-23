@@ -19,31 +19,27 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # Decode and place your permanent keystore
+      # ←←← FIXED PART STARTS HERE
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $HOME/my-release-key.jks
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # Optional: see what tasks are available
-      # - name: List tasks
-      #   run: ./gradlew tasks --all
+          mkdir -p $HOME/keystores
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $HOME/keystores/my-release-key.jks
 
       - name: Build & Sign Debug APK with Permanent Key
         env:
-          KEYSTORE_PATH: $HOME/my-release-key.jks
+          # Use an absolute path that definitely exists and doesn’t contain $HOME
+          KEYSTORE_PATH: /home/runner/keystores/my-release-key.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew assembleDebug \
-            -Pandroid.injected.signing.store.file=$KEYSTORE_PATH \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD \
+          ./gradlew clean assembleDebug \
+            -Pandroid.injected.signing.store.file="${KEYSTORE_PATH}" \
+            -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
+            -Pandroid.injected.signing.key.alias="${KEY_ALIAS}" \
+            -Pandroid.injected.signing.key.password="${KEY_PASSWORD}" \
             --stacktrace
+      # ←←← FIXED PART ENDS HERE
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
