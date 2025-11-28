@@ -24,7 +24,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.PermissionRequest;
 import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -62,6 +61,7 @@ public class MainActivity extends Activity {
             @android.webkit.JavascriptInterface
             public void downloadBase64File(String base64Data, String fileName) {
                 try {
+                    // Remove data URL prefix if present
                     if (base64Data.contains(",")) {
                         base64Data = base64Data.split(",")[1];
                     }
@@ -111,6 +111,7 @@ public class MainActivity extends Activity {
             @android.webkit.JavascriptInterface
             public void downloadImageFromUrl(String imageUrl, String fileName) {
                 try {
+                    // For external URLs, use download manager
                     DownloadManager.Request request = new DownloadManager.Request(Uri.parse(imageUrl));
                     request.setMimeType("image/png");
                     request.setDescription("Downloading generated image...");
@@ -217,7 +218,7 @@ public class MainActivity extends Activity {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false);
         
-        // THIS IS CRITICAL FOR speechSynthesis.speak() TO WORK FROM WEBSITE
+        // Enable media playback
         webSettings.setMediaPlaybackRequiresUserGesture(false);
 
         // Cookie management
@@ -225,25 +226,28 @@ public class MainActivity extends Activity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(mWebView, true);
 
-        // Enhanced WebView client
+        // Enhanced WebView client with proper link handling
         mWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 Log.d(TAG, "Loading URL: " + url);
                 
-                if (url.startsWith("http") && !url.contains("x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
+                // Handle external URLs in browser
+                if (url.startsWith("http") && !url.contains("n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app")) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                         startActivity(intent);
                         return true;
                     } catch (Exception e) {
                         Log.e(TAG, "Error opening URL in browser: " + e.getMessage());
+                        // If browser fails, load in WebView
                         view.loadUrl(url);
                         return true;
                     }
                 }
                 
+                // Handle tel:, mailto:, sms: etc.
                 if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("sms:") || url.startsWith("whatsapp:")) {
                     try {
                         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
@@ -255,6 +259,7 @@ public class MainActivity extends Activity {
                     }
                 }
                 
+                // Load internal URLs in WebView
                 return false;
             }
             
@@ -266,9 +271,9 @@ public class MainActivity extends Activity {
             }
         });
         
-        // CRITICAL: WebChromeClient with full permission support including Speech Synthesis
+        // Enhanced WebChromeClient for file uploads, camera, microphone, and window handling
         mWebView.setWebChromeClient(new WebChromeClient() {
-            // File chooser
+            // For file upload support
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
                 MainActivity.this.filePathCallback = filePathCallback;
@@ -282,31 +287,55 @@ public class MainActivity extends Activity {
                 return true;
             }
             
-            // THIS IS THE KEY FIX: Grant all permissions including speech synthesis
+            // Handle permission requests for camera and microphone
             @Override
-            public void onPermissionRequest(PermissionRequest request) {
-                runOnUiThread(() -> {
-                    // Grant ALL requested resources (camera, mic, and PROTECTED_MEDIA_ID for TTS)
-                    request.grant(request.getResources());
-                });
+            public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                String[] resources = request.getResources();
+                for (String resource : resources) {
+                    switch (resource) {
+                        case android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE:
+                            if (ContextCompat.checkSelfPermission(MainActivity.this, 
+                                android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                request.grant(new String[]{resource});
+                            } else {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                    new String[]{android.Manifest.permission.CAMERA},
+                                    CAMERA_PERMISSION_REQUEST_CODE);
+                            }
+                            break;
+                        case android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE:
+                            if (ContextCompat.checkSelfPermission(MainActivity.this, 
+                                android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                request.grant(new String[]{resource});
+                            } else {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                    new String[]{android.Manifest.permission.RECORD_AUDIO},
+                                    MICROPHONE_PERMISSION_REQUEST_CODE);
+                            }
+                            break;
+                    }
+                }
             }
             
-            // Handle new windows
+            // Handle new windows - for openFullBtn functionality
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                // Get the URL that's trying to open in new window
                 WebView.HitTestResult result = view.getHitTestResult();
                 String url = result.getExtra();
                 
                 if (url != null && !url.isEmpty()) {
                     Log.d(TAG, "Opening URL in same WebView: " + url);
+                    // Load the URL in the same WebView instead of new window
                     view.loadUrl(url);
                 }
                 
+                // We don't create a new window, so return false
                 return false;
             }
         });
 
-        // Download listener
+        // Enhanced download listener
         mWebView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
             try {
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
@@ -318,6 +347,7 @@ public class MainActivity extends Activity {
                 request.setTitle(fileName);
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
+                // Set destination based on Android version
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     request.setDestinationInExternalFilesDir(getApplicationContext(), Environment.DIRECTORY_DOWNLOADS, fileName);
                 } else {
@@ -337,9 +367,9 @@ public class MainActivity extends Activity {
             }
         });
 
-        // Load URL
+        // Load URL based on network availability
         if (isNetworkAvailable()) {
-            mWebView.loadUrl("https://x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+            mWebView.loadUrl("n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
         } else {
             mWebView.loadUrl("file:///android_asset/offline.html");
         }
@@ -351,7 +381,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     String currentUrl = mWebView.getUrl();
                     if (currentUrl != null && currentUrl.startsWith("file:///android_asset")) {
-                        mWebView.loadUrl("https://x0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+                        mWebView.loadUrl("n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
                     }
                 });
             }
@@ -375,40 +405,52 @@ public class MainActivity extends Activity {
     private void injectJavaScript() {
         String javascriptCode = 
             "(function() {" +
+            "    // Override download functions to use Android interface" +
             "    if (typeof window.Android !== 'undefined') {" +
             "        console.log('Android interface detected, setting up download handlers...');" +
+            "        " +
+            "        // Override conversation download" +
             "        const originalDownloadConversation = window.downloadConversation;" +
             "        if (originalDownloadConversation) {" +
             "            window.downloadConversation = function(conversationId) {" +
             "                const conversation = window.conversations.find(c => c.id === conversationId);" +
             "                if (!conversation) return;" +
-            "                let conversationText = 'Nurvle Conversation\\n';" +
-            "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\n';" +
-            "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\n';" +
-            "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\n';" +
-            "                conversationText += '='.repeat(50) + '\\n\\n';" +
+            "                " +
+            "                let conversationText = 'Nurvle Conversation\\\\n';" +
+            "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\\\n';" +
+            "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\\\n';" +
+            "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\\\n';" +
+            "                conversationText += '='.repeat(50) + '\\\\n\\\\n';" +
+            "                " +
             "                conversation.messages.forEach((message, index) => {" +
             "                    const isUser = message.role === 'user';" +
             "                    const sender = isUser ? 'USER' : 'ASSISTANT';" +
             "                    const content = message.content || '';" +
+            "                    " +
             "                    if (index > 0) {" +
-            "                        conversationText += '\\n' + '-'.repeat(50) + '\\n\\n';" +
+            "                        conversationText += '\\\\n' + '-'.repeat(50) + '\\\\n\\\\n';" +
             "                    }" +
-            "                    conversationText += sender + ':\\n';" +
-            "                    conversationText += content + '\\n';" +
+            "                    " +
+            "                    conversationText += sender + ':\\\\n';" +
+            "                    conversationText += content + '\\\\n';" +
+            "                    " +
             "                    if (isUser && message.files && message.files.length > 0) {" +
-            "                        conversationText += '\\nAttachments:\\n';" +
+            "                        conversationText += '\\\\nAttachments:\\\\n';" +
             "                        message.files.forEach(file => {" +
-            "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\n';" +
+            "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\\\n';" +
             "                        });" +
             "                    }" +
             "                });" +
-            "                conversationText += '\\n' + '='.repeat(50) + '\\n';" +
-            "                conversationText += 'End of conversation\\n';" +
+            "                " +
+            "                conversationText += '\\\\n' + '='.repeat(50) + '\\\\n';" +
+            "                conversationText += 'End of conversation\\\\n';" +
+            "                " +
             "                const fileName = 'nurvle_conversation_' + conversationId + '_' + Date.now() + '.txt';" +
             "                window.Android.downloadTextFile(conversationText, fileName);" +
             "            };" +
             "        }" +
+            "        " +
+            "        // Override image download" +
             "        const originalDownloadGeneratedImage = window.downloadGeneratedImage;" +
             "        if (originalDownloadGeneratedImage) {" +
             "            window.downloadGeneratedImage = function(imageUrl, prompt) {" +
@@ -417,6 +459,8 @@ public class MainActivity extends Activity {
             "                window.Android.downloadImageFromUrl(imageUrl, fileName);" +
             "            };" +
             "        }" +
+            "        " +
+            "        // Override response download" +
             "        const originalDownloadResponse = window.downloadResponse;" +
             "        if (originalDownloadResponse) {" +
             "            window.downloadResponse = function(textContent, messageId) {" +
@@ -424,18 +468,26 @@ public class MainActivity extends Activity {
             "                window.Android.downloadTextFile(textContent, fileName);" +
             "            };" +
             "        }" +
+            "        " +
+            "        // Fix Open Full button to open in same WebView instead of new window" +
             "        const overrideWindowOpen = function() {" +
             "            const originalWindowOpen = window.open;" +
             "            window.open = function(url, name, specs, replace) {" +
             "                console.log('window.open called with URL:', url);" +
+            "                " +
+            "                // If it's an image URL from openFullBtn, load it in the same WebView" +
             "                if (url && (url.includes('.png') || url.includes('.jpg') || url.includes('.jpeg') || url.includes('.gif') || url.includes('.webp'))) {" +
             "                    console.log('Image URL detected, loading in same WebView:', url);" +
             "                    window.location.href = url;" +
             "                    return window;" +
             "                }" +
+            "                " +
+            "                // For other URLs, use the original behavior" +
             "                return originalWindowOpen.call(window, url, name, specs, replace);" +
             "            };" +
             "        };" +
+            "        " +
+            "        // Override the openFullBtn click handler" +
             "        const overrideOpenFullButton = function() {" +
             "            document.addEventListener('click', function(e) {" +
             "                const openFullBtn = e.target.closest('.image-action-btn');" +
@@ -453,8 +505,12 @@ public class MainActivity extends Activity {
             "                }" +
             "            });" +
             "        };" +
+            "        " +
+            "        // Run the overrides" +
             "        overrideWindowOpen();" +
             "        overrideOpenFullButton();" +
+            "        " +
+            "        // Enhanced camera button functionality" +
             "        const cameraBtn = document.getElementById('camera-btn');" +
             "        if (cameraBtn) {" +
             "            cameraBtn.addEventListener('click', function() {" +
@@ -464,6 +520,8 @@ public class MainActivity extends Activity {
             "                }" +
             "            });" +
             "        }" +
+            "        " +
+            "        // Enhanced microphone button functionality" +
             "        const micBtn = document.getElementById('mic-btn');" +
             "        if (micBtn) {" +
             "            micBtn.addEventListener('click', function() {" +
@@ -498,6 +556,7 @@ public class MainActivity extends Activity {
     }
 
     private void requestNecessaryPermissions() {
+        // Request all necessary permissions at once
         String[] permissions = new String[]{
             android.Manifest.permission.CAMERA,
             android.Manifest.permission.RECORD_AUDIO,
@@ -522,8 +581,10 @@ public class MainActivity extends Activity {
             }
             
             if (allGranted) {
+                // Only show toast if this is the first time permissions are granted
                 if (!sharedPreferences.getBoolean(PERMISSIONS_GRANTED_KEY, false)) {
                     Toast.makeText(this, "All permissions granted", Toast.LENGTH_SHORT).show();
+                    // Save that permissions have been granted
                     sharedPreferences.edit().putBoolean(PERMISSIONS_GRANTED_KEY, true).apply();
                 }
             } else {
@@ -531,6 +592,7 @@ public class MainActivity extends Activity {
             }
         }
         
+        // Notify WebView about permission changes
         mWebView.reload();
     }
 
