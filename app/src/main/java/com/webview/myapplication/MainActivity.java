@@ -229,6 +229,12 @@ public class MainActivity extends Activity {
         // Enhanced WebView client with proper link handling
         mWebView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                injectEarlyJavaScriptStub();
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 Log.d(TAG, "Loading URL: " + url);
@@ -369,7 +375,7 @@ public class MainActivity extends Activity {
 
         // Load URL based on network availability
         if (isNetworkAvailable()) {
-            mWebView.loadUrl("n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+            mWebView.loadUrl("https://n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
         } else {
             mWebView.loadUrl("file:///android_asset/offline.html");
         }
@@ -381,7 +387,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     String currentUrl = mWebView.getUrl();
                     if (currentUrl != null && currentUrl.startsWith("file:///android_asset")) {
-                        mWebView.loadUrl("n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
+                        mWebView.loadUrl("https://n0loq7r9a2zb3xn4k8yp6tm5wv1ucqjhf.netlify.app");
                     }
                 });
             }
@@ -400,6 +406,23 @@ public class MainActivity extends Activity {
         if (connectivityManager != null) {
             connectivityManager.registerDefaultNetworkCallback(networkCallback);
         }
+    }
+
+    // Add this helper method to inject a tiny stub early
+    @SuppressLint("SetJavaScriptEnabled")
+    private void injectEarlyJavaScriptStub() {
+        String earlyStub = 
+            "(function() {" +
+            "    if (typeof Android === 'undefined') {" +
+            "        window.Android = {" +
+            "            downloadTextFile: function(text, filename) { console.warn('Android.downloadTextFile called before interface ready'); }, " +
+            "            downloadImageFromUrl: function(url, filename) { console.warn('Android.downloadImageFromUrl called before interface ready'); }" +
+            "        };" +
+            "        console.log('Early Android stub injected to prevent undefined errors');" +
+            "    }" +
+            "})();";
+
+        mWebView.evaluateJavascript(earlyStub, null);
     }
 
     private void injectJavaScript() {
