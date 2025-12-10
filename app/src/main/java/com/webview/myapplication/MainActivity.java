@@ -108,35 +108,31 @@ public class MainActivity extends Activity {
                 }
             }
 
-            @android.webkit.JavascriptInterface
-            public void downloadImageFromUrl(String imageUrl, String fileName) {
-                try {
-                    // For external URLs, use download manager
-                    DownloadManager.Request request = new DownloadManager.Request(Uri.parse(imageUrl));
-                    request.setMimeType("image/png");
-                    request.setDescription("Downloading generated image...");
-                    request.setTitle(fileName);
-                    request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+@android.webkit.JavascriptInterface
+public void downloadImageFromUrl(String imageUrl, String fileName) {
+    try {
+        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(imageUrl));
+        request.setMimeType("image/png");
+        request.setDescription("Downloading generated image...");
+        request.setTitle(fileName);
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                        request.setDestinationInExternalFilesDir(getApplicationContext(), Environment.DIRECTORY_DOWNLOADS, fileName);
-                    } else {
-                        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-                    }
+        // Always save to public Downloads (works on all versions, including Android 10+)
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
 
-                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                    dm.enqueue(request);
-                    
-                    runOnUiThread(() -> 
-                        Toast.makeText(getApplicationContext(), "Downloading image: " + fileName, Toast.LENGTH_LONG).show()
-                    );
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    runOnUiThread(() -> 
-                        Toast.makeText(getApplicationContext(), "Failed to download image: " + e.getMessage(), Toast.LENGTH_LONG).show()
-                    );
-                }
-            }
+        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+        dm.enqueue(request);
+        
+        runOnUiThread(() -> 
+            Toast.makeText(getApplicationContext(), "Downloading image: " + fileName, Toast.LENGTH_LONG).show()
+        );
+    } catch (Exception e) {
+        e.printStackTrace();
+        runOnUiThread(() -> 
+            Toast.makeText(getApplicationContext(), "Failed to download image: " + e.getMessage(), Toast.LENGTH_LONG).show()
+        );
+    }
+}
 
             @android.webkit.JavascriptInterface
             public void openInBrowser(String url) {
