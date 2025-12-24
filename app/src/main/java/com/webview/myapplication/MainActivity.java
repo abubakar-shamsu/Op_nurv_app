@@ -50,13 +50,6 @@ public class MainActivity extends Activity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-    getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-    getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
-        }
-        
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -65,34 +58,19 @@ public class MainActivity extends Activity {
 
         // Enhanced JavaScript interface for file operations
         mWebView.addJavascriptInterface(new Object() {
-@android.webkit.JavascriptInterface
-public void setTheme(String themeName) {
-    runOnUiThread(() -> {
-        updateSystemBarsColor(themeName);
-    });
-}
-}
-
-            
             @android.webkit.JavascriptInterface
-            public void downloadBase64File(String base64Data, String fileName) {
+            public void downloadBase64File(String textContent, String fileName) {
                 try {
-                    // Remove data URL prefix if present
-                    if (base64Data.contains(",")) {
-                        base64Data = base64Data.split(",")[1];
-                    }
-                    
-                    byte[] fileAsBytes = Base64.decode(base64Data, Base64.DEFAULT);
                     File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
                     File filePath = new File(downloadsDir, fileName);
                     
                     FileOutputStream os = new FileOutputStream(filePath);
-                    os.write(fileAsBytes);
+                    os.write(textContent.getBytes());
                     os.flush();
                     os.close();
 
                     runOnUiThread(() -> 
-                        Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
+                        Toast.makeText(getApplicationContext(), "response saved: " + fileName, Toast.LENGTH_LONG).show()
                     );
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -607,46 +585,7 @@ public void downloadImageFromUrl(String imageUrl, String fileName) {
         // Notify WebView about permission changes
         mWebView.reload();
     }
-private void updateSystemBarsColor(String theme) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        Window window = getWindow();
-        int statusBarColor, navigationBarColor;
 
-        switch (theme) {
-            case "dark":
-                statusBarColor = Color.BLACK;
-                navigationBarColor = Color.BLACK;
-                break;
-            case "calm":
-                // calm-theme uses #212121 in CSS → near-black but slightly lighter
-                statusBarColor = Color.parseColor("#212121");
-                navigationBarColor = Color.parseColor("#212121");
-                break;
-            case "light":
-            default:
-                statusBarColor = Color.WHITE;
-                navigationBarColor = Color.WHITE;
-                break;
-        }
-
-        window.setStatusBarColor(statusBarColor);
-        window.setNavigationBarColor(navigationBarColor);
-
-        // Optional: adjust status bar icons (light/dark)
-        View decorView = window.getDecorView();
-        int flags = decorView.getSystemUiVisibility();
-        if (theme.equals("light")) {
-            // Light background → dark icons
-            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        } else {
-            // Dark background → light icons
-            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-        }
-        decorView.setSystemUiVisibility(flags);
-    }
-        }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
