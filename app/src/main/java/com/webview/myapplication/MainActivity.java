@@ -600,7 +600,46 @@ public void downloadImageFromUrl(String imageUrl, String fileName) {
         // Notify WebView about permission changes
         mWebView.reload();
     }
+private void updateSystemBarsColor(String theme) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        Window window = getWindow();
+        int statusBarColor, navigationBarColor;
 
+        switch (theme) {
+            case "dark":
+                statusBarColor = Color.BLACK;
+                navigationBarColor = Color.BLACK;
+                break;
+            case "calm":
+                // calm-theme uses #212121 in CSS → near-black but slightly lighter
+                statusBarColor = Color.parseColor("#212121");
+                navigationBarColor = Color.parseColor("#212121");
+                break;
+            case "light":
+            default:
+                statusBarColor = Color.WHITE;
+                navigationBarColor = Color.WHITE;
+                break;
+        }
+
+        window.setStatusBarColor(statusBarColor);
+        window.setNavigationBarColor(navigationBarColor);
+
+        // Optional: adjust status bar icons (light/dark)
+        View decorView = window.getDecorView();
+        int flags = decorView.getSystemUiVisibility();
+        if (theme.equals("light")) {
+            // Light background → dark icons
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        } else {
+            // Dark background → light icons
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        decorView.setSystemUiVisibility(flags);
+    }
+        }
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
