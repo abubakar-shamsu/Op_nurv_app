@@ -58,6 +58,15 @@ public class MainActivity extends Activity {
 
         // Enhanced JavaScript interface for file operations
         mWebView.addJavascriptInterface(new Object() {
+@android.webkit.JavascriptInterface
+public void setTheme(String themeName) {
+    runOnUiThread(() -> {
+        updateSystemBarsColor(themeName);
+    });
+}
+}
+
+            
             @android.webkit.JavascriptInterface
             public void downloadBase64File(String base64Data, String fileName) {
                 try {
