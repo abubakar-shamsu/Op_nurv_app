@@ -11,8 +11,8 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Status bar color. -->
             <!-- Colors for Light Mode -->
-        <item name="android:statusBarColor">@color/transparent</item>      <!-- White status bar -->
-        <item name="android:navigationBarColor">@color/transparent</item> <!-- White nav bar -->
+        <item name="android:statusBarColor">@color/white</item>      <!-- White status bar -->
+        <item name="android:navigationBarColor">@color/white</item> <!-- White nav bar -->
         <item name="android:windowLightStatusBar" tools:targetApi="m">true</item> <!-- Makes status bar icons dark -->
         <item name="android:windowLightNavigationBar" tools:targetApi="o">true</item> <!-- Makes nav bar icons dark -->
         <!-- Customize your theme here. -->
