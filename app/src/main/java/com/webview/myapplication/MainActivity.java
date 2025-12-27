@@ -80,52 +80,54 @@ public class MainActivity extends Activity {
                 }
             }
 
-            @android.webkit.JavascriptInterface
+            @JavascriptInterface
 public void downloadTextFile(String textContent, String fileName) {
     try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            // Android 10+ — use MediaStore
+        Context context = getApplicationContext(); // or use your Activity context
+        ContentResolver resolver = context.getContentResolver();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Modern way — Android 10+
             ContentValues values = new ContentValues();
             values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
             values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
-            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+            values.put(MediaStore.Downloads.RELATIVE_PATH, "Download");          // ← most reliable choice
 
-            Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
-            if (uri != null) {
-                try (OutputStream os = getContentResolver().openOutputStream(uri)) {
-                    os.write(textContent.getBytes("UTF-8"));
-                    os.flush();
-                }
-                runOnUiThread(() -> 
-                    Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
-                );
-            } else {
+            // Optional but recommended — makes file visible faster on some ROMs
+            long now = System.currentTimeMillis() / 1000;
+            values.put(MediaStore.Downloads.DATE_ADDED, now);
+            values.put(MediaStore.Downloads.DATE_MODIFIED, now);
+
+            Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) {
                 throw new IOException("Failed to create download URI");
             }
-        } else {
-            // Android 9 and below — use legacy file API
-            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-            File file = new File(downloadsDir, fileName);
-            try (FileOutputStream fos = new FileOutputStream(file)) {
-                fos.write(textContent.getBytes("UTF-8"));
-                fos.flush();
+
+            try (OutputStream os = resolver.openOutputStream(uri)) {
+                os.write(textContent.getBytes(StandardCharsets.UTF_8));
+                os.flush();
             }
-            // Notify MediaStore so file appears in Downloads
-            MediaScannerConnection.scanFile(getApplicationContext(),
-                new String[]{file.getAbsolutePath()},
-                new String[]{"text/plain"},
-                null
-            );
-            runOnUiThread(() -> 
-                Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
-            );
+
+            // Optional: clear pending state (usually not needed anymore)
+            // values.clear();
+            // values.put(MediaStore.Downloads.IS_PENDING, 0);
+            // resolver.update(uri, values, null, null);
+
+            showToast("Saved to Downloads: " + fileName);
+        } else {
+            // Legacy path — Android 9 and older (you can keep your current code)
+            // ...
         }
     } catch (Exception e) {
         e.printStackTrace();
-        runOnUiThread(() ->
-            Toast.makeText(getApplicationContext(), "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
-        );
+        showToast("Save failed: " + e.getClass().getSimpleName());
     }
+}
+
+private void showToast(final String msg) {
+    runOnUiThread(() -> 
+        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show()
+    );
 }
 
 @android.webkit.JavascriptInterface
