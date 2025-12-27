@@ -115,8 +115,22 @@ public void downloadTextFile(String textContent, String fileName) {
 
             showToast("Saved to Downloads: " + fileName);
         } else {
-            // Legacy path — Android 9 and older (you can keep your current code)
-            // ...
+                        // Android 9 and below — use legacy file API
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File file = new File(downloadsDir, fileName);
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(textContent.getBytes("UTF-8"));
+                fos.flush();
+            }
+            // Notify MediaStore so file appears in Downloads
+            MediaScannerConnection.scanFile(getApplicationContext(),
+                new String[]{file.getAbsolutePath()},
+                new String[]{"text/plain"},
+                null
+            );
+            runOnUiThread(() -> 
+                Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
+            );
         }
     } catch (Exception e) {
         e.printStackTrace();
