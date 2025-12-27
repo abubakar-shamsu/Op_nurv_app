@@ -83,18 +83,43 @@ public class MainActivity extends Activity {
             @android.webkit.JavascriptInterface
 public void downloadTextFile(String textContent, String fileName) {
     try {
-        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File filePath = new File(downloadsDir, fileName);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            // Android 10+ — use MediaStore
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
+            values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
+            values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
 
-        // ✅ Use UTF-8
-        FileOutputStream os = new FileOutputStream(filePath);
-        os.write(textContent.getBytes("UTF-8"));
-        os.flush();
-        os.close();
-
-        runOnUiThread(() ->
-            Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
-        );
+            Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (uri != null) {
+                try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                    os.write(textContent.getBytes("UTF-8"));
+                    os.flush();
+                }
+                runOnUiThread(() -> 
+                    Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
+                );
+            } else {
+                throw new IOException("Failed to create download URI");
+            }
+        } else {
+            // Android 9 and below — use legacy file API
+            File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File file = new File(downloadsDir, fileName);
+            try (FileOutputStream fos = new FileOutputStream(file)) {
+                fos.write(textContent.getBytes("UTF-8"));
+                fos.flush();
+            }
+            // Notify MediaStore so file appears in Downloads
+            MediaScannerConnection.scanFile(getApplicationContext(),
+                new String[]{file.getAbsolutePath()},
+                new String[]{"text/plain"},
+                null
+            );
+            runOnUiThread(() -> 
+                Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
+            );
+        }
     } catch (Exception e) {
         e.printStackTrace();
         runOnUiThread(() ->
