@@ -81,26 +81,27 @@ public class MainActivity extends Activity {
             }
 
             @android.webkit.JavascriptInterface
-            public void downloadTextFile(String textContent, String fileName) {
-                try {
-                    File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                    File filePath = new File(downloadsDir, fileName);
-                    
-                    FileOutputStream os = new FileOutputStream(filePath);
-                    os.write(textContent.getBytes());
-                    os.flush();
-                    os.close();
+public void downloadTextFile(String textContent, String fileName) {
+    try {
+        File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        File filePath = new File(downloadsDir, fileName);
 
-                    runOnUiThread(() -> 
-                        Toast.makeText(getApplicationContext(), "Conversation saved: " + fileName, Toast.LENGTH_LONG).show()
-                    );
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    runOnUiThread(() -> 
-                        Toast.makeText(getApplicationContext(), "Failed to save conversation: " + e.getMessage(), Toast.LENGTH_LONG).show()
-                    );
-                }
-            }
+        // ✅ Use UTF-8
+        FileOutputStream os = new FileOutputStream(filePath);
+        os.write(textContent.getBytes("UTF-8"));
+        os.flush();
+        os.close();
+
+        runOnUiThread(() ->
+            Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
+        );
+    } catch (Exception e) {
+        e.printStackTrace();
+        runOnUiThread(() ->
+            Toast.makeText(getApplicationContext(), "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
+        );
+    }
+}
 
 @android.webkit.JavascriptInterface
 public void downloadImageFromUrl(String imageUrl, String fileName) {
