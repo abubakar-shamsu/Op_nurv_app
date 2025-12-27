@@ -17,6 +17,7 @@ import android.os.Environment;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -80,57 +81,45 @@ public class MainActivity extends Activity {
                 }
             }
 
-                    @JavascriptInterface
-        public void downloadTextFile(String content, String fileName) {
-            try {
-                File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName);
-                FileOutputStream fos = new FileOutputStream(file);
-                fos.write(content.getBytes());
-                fos.close();
-                sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Saved: " + fileName, Toast.LENGTH_LONG).show());
-            } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Save failed", Toast.LENGTH_SHORT).show());
+            @JavascriptInterface
+            public void downloadTextFile(String content, String fileName) {
+                try {
+                    File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName);
+                    FileOutputStream fos = new FileOutputStream(file);
+                    fos.write(content.getBytes());
+                    fos.close();
+                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(file)));
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Saved: " + fileName, Toast.LENGTH_LONG).show());
+                } catch (Exception e) {
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Save failed", Toast.LENGTH_SHORT).show());
+                }
             }
-        }
 
-// Helper method (put this inside your class)
-private void showToast(final String message) {
-    if (getActivity() != null) { // If you're in Fragment
-        getActivity().runOnUiThread(() ->
-                Toast.makeText(getActivity(), message, Toast.LENGTH_LONG).show());
-    } else {
-        // If you're in Activity or have direct access to context
-        runOnUiThread(() ->
-                Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show());
-    }
-}
+            @JavascriptInterface
+            public void downloadImageFromUrl(String imageUrl, String fileName) {
+                try {
+                    DownloadManager.Request request = new DownloadManager.Request(Uri.parse(imageUrl));
+                    request.setMimeType("image/png");
+                    request.setDescription("Downloading generated image...");
+                    request.setTitle(fileName);
+                    request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
-@android.webkit.JavascriptInterface
-public void downloadImageFromUrl(String imageUrl, String fileName) {
-    try {
-        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(imageUrl));
-        request.setMimeType("image/png");
-        request.setDescription("Downloading generated image...");
-        request.setTitle(fileName);
-        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    // Always save to public Downloads (works on all versions, including Android 10+)
+                    request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
 
-        // Always save to public Downloads (works on all versions, including Android 10+)
-        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-
-        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        dm.enqueue(request);
-        
-        runOnUiThread(() -> 
-            Toast.makeText(getApplicationContext(), "Downloading image: " + fileName, Toast.LENGTH_LONG).show()
-        );
-    } catch (Exception e) {
-        e.printStackTrace();
-        runOnUiThread(() -> 
-            Toast.makeText(getApplicationContext(), "Failed to download image: " + e.getMessage(), Toast.LENGTH_LONG).show()
-        );
-    }
-}
+                    DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                    dm.enqueue(request);
+                    
+                    runOnUiThread(() -> 
+                        Toast.makeText(getApplicationContext(), "Downloading image: " + fileName, Toast.LENGTH_LONG).show()
+                    );
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    runOnUiThread(() -> 
+                        Toast.makeText(getApplicationContext(), "Failed to download image: " + e.getMessage(), Toast.LENGTH_LONG).show()
+                    );
+                }
+            }
 
             @android.webkit.JavascriptInterface
             public void openInBrowser(String url) {
@@ -181,10 +170,10 @@ public void downloadImageFromUrl(String imageUrl, String fileName) {
                 });
             }
 
-            @android.webkit.JavascriptInterface
+            @JavascriptInterface
             public void showToast(String message) {
                 runOnUiThread(() -> 
-                    Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show()
                 );
             }
 
@@ -410,11 +399,11 @@ public void downloadImageFromUrl(String imageUrl, String fileName) {
             "                const conversation = window.conversations.find(c => c.id === conversationId);" +
             "                if (!conversation) return;" +
             "                " +
-            "                let conversationText = 'Nurvle Conversation\\\\n';" +
-            "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\\\n';" +
-            "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\\\n';" +
-            "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\\\n';" +
-            "                conversationText += '='.repeat(50) + '\\\\n\\\\n';" +
+            "                let conversationText = 'Nurvle Conversation\\n';" +
+            "                conversationText += 'Title: ' + (conversation.title || 'Untitled') + '\\n';" +
+            "                conversationText += 'Date: ' + new Date(conversation.timestamp).toLocaleDateString() + '\\n';" +
+            "                conversationText += 'Time: ' + new Date(conversation.timestamp).toLocaleTimeString() + '\\n';" +
+            "                conversationText += '='.repeat(50) + '\\n\\n';" +
             "                " +
             "                conversation.messages.forEach((message, index) => {" +
             "                    const isUser = message.role === 'user';" +
@@ -422,22 +411,22 @@ public void downloadImageFromUrl(String imageUrl, String fileName) {
             "                    const content = message.content || '';" +
             "                    " +
             "                    if (index > 0) {" +
-            "                        conversationText += '\\\\n' + '-'.repeat(50) + '\\\\n\\\\n';" +
+            "                        conversationText += '\\n' + '-'.repeat(50) + '\\n\\n';" +
             "                    }" +
             "                    " +
-            "                    conversationText += sender + ':\\\\n';" +
-            "                    conversationText += content + '\\\\n';" +
+            "                    conversationText += sender + ':\\n';" +
+            "                    conversationText += content + '\\n';" +
             "                    " +
             "                    if (isUser && message.files && message.files.length > 0) {" +
-            "                        conversationText += '\\\\nAttachments:\\\\n';" +
+            "                        conversationText += '\\nAttachments:\\n';" +
             "                        message.files.forEach(file => {" +
-            "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\\\n';" +
+            "                            conversationText += '- ' + file.name + ' (' + file.type + ', ' + (file.size / 1024).toFixed(2) + ' KB)\\n';" +
             "                        });" +
             "                    }" +
             "                });" +
             "                " +
-            "                conversationText += '\\\\n' + '='.repeat(50) + '\\\\n';" +
-            "                conversationText += 'End of conversation\\\\n';" +
+            "                conversationText += '\\n' + '='.repeat(50) + '\\n';" +
+            "                conversationText += 'End of conversation\\n';" +
             "                " +
             "                const fileName = 'nurvle_conversation_' + conversationId + '_' + Date.now() + '.txt';" +
             "                window.Android.downloadTextFile(conversationText, fileName);" +
