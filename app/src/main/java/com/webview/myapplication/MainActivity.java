@@ -83,17 +83,17 @@ public class MainActivity extends Activity {
             @JavascriptInterface
 public void downloadTextFile(String textContent, String fileName) {
     try {
-        Context context = getApplicationContext(); // or use your Activity context
+        Context context = getApplicationContext(); // or use your Activity/WebView context if preferred
         ContentResolver resolver = context.getContentResolver();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Modern way — Android 10+
+            // ── Modern way: Android 10+ (Q and newer) ──
             ContentValues values = new ContentValues();
             values.put(MediaStore.Downloads.DISPLAY_NAME, fileName);
             values.put(MediaStore.Downloads.MIME_TYPE, "text/plain");
-            values.put(MediaStore.Downloads.RELATIVE_PATH, "Download");          // ← most reliable choice
+            values.put(MediaStore.Downloads.RELATIVE_PATH, "Download"); // Most reliable spelling
 
-            // Optional but recommended — makes file visible faster on some ROMs
+            // Helps some file managers show the file faster
             long now = System.currentTimeMillis() / 1000;
             values.put(MediaStore.Downloads.DATE_ADDED, now);
             values.put(MediaStore.Downloads.DATE_MODIFIED, now);
@@ -104,44 +104,58 @@ public void downloadTextFile(String textContent, String fileName) {
             }
 
             try (OutputStream os = resolver.openOutputStream(uri)) {
-                os.write(textContent.getBytes(StandardCharsets.UTF_8));
-                os.flush();
+                if (os != null) {
+                    os.write(textContent.getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
             }
-
-            // Optional: clear pending state (usually not needed anymore)
-            // values.clear();
-            // values.put(MediaStore.Downloads.IS_PENDING, 0);
-            // resolver.update(uri, values, null, null);
 
             showToast("Saved to Downloads: " + fileName);
+
         } else {
-                        // Android 9 and below — use legacy file API
+            // ── Legacy way: Android 9 and older ──
             File downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            
+            // Make sure the directory exists
+            if (!downloadsDir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                downloadsDir.mkdirs();
+            }
+
             File file = new File(downloadsDir, fileName);
+
             try (FileOutputStream fos = new FileOutputStream(file)) {
-                fos.write(textContent.getBytes("UTF-8"));
+                fos.write(textContent.getBytes(StandardCharsets.UTF_8));
                 fos.flush();
             }
-            // Notify MediaStore so file appears in Downloads
-            MediaScannerConnection.scanFile(getApplicationContext(),
-                new String[]{file.getAbsolutePath()},
-                new String[]{"text/plain"},
-                null
-            );
-            runOnUiThread(() -> 
-                Toast.makeText(getApplicationContext(), "Saved: " + fileName, Toast.LENGTH_LONG).show()
-            );
+
+            // Very important: tell MediaStore about the new file
+            MediaScannerConnection.scanFile(context,
+                    new String[]{file.getAbsolutePath()},
+                    new String[]{"text/plain"},
+                    (path, newUri) -> {
+                        // Optional: you can log or do something with the new URI
+                    });
+
+            showToast("Saved to Downloads: " + fileName);
         }
+
     } catch (Exception e) {
         e.printStackTrace();
         showToast("Save failed: " + e.getClass().getSimpleName());
     }
 }
 
-private void showToast(final String msg) {
-    runOnUiThread(() -> 
-        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show()
-    );
+// Helper method (put this inside your class)
+private void showToast(final String message) {
+    if (getActivity() != null) { // If you're in Fragment
+        getActivity().runOnUiThread(() ->
+                Toast.makeText(getActivity(), message, Toast.LENGTH_LONG).show());
+    } else {
+        // If you're in Activity or have direct access to context
+        runOnUiThread(() ->
+                Toast.makeText(getApplicationContext(), message, Toast.LENGTH_LONG).show());
+    }
 }
 
 @android.webkit.JavascriptInterface
