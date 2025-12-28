@@ -482,7 +482,6 @@ public class MainActivity extends Activity {
             "                        const img = imageContainer.querySelector('img');" +
             "                        if (img && img.src) {" +
             "                            console.log('Open Full button clicked, loading image in same WebView:', img.src);" +
-            "                            window.location.href = img.src;" +
             "                        }" +
             "                    }" +
             "                }" +
@@ -491,7 +490,6 @@ public class MainActivity extends Activity {
             "        " +
             "        // Run the overrides" +
             "        overrideWindowOpen();" +
-            "        overrideOpenFullButton();" +
             "        " +
             "        // Enhanced camera button functionality" +
             "        const cameraBtn = document.getElementById('camera-btn');" +
