@@ -470,24 +470,6 @@ public class MainActivity extends Activity {
             "            };" +
             "        };" +
             "        " +
-            "        // Override the openFullBtn click handler" +
-            "        const overrideOpenFullButton = function() {" +
-            "            document.addEventListener('click', function(e) {" +
-            "                const openFullBtn = e.target.closest('.image-action-btn');" +
-            "                if (openFullBtn && openFullBtn.innerHTML.includes('M20 6L9 17L4 12')) {" +
-            "                    e.preventDefault();" +
-            "                    e.stopPropagation();" +
-            "                    const imageContainer = openFullBtn.closest('.generated-image-container');" +
-            "                    if (imageContainer) {" +
-            "                        const img = imageContainer.querySelector('img');" +
-            "                        if (img && img.src) {" +
-            "                            console.log('Open Full button clicked, loading image in same WebView:', img.src);" +
-            "                        }" +
-            "                    }" +
-            "                }" +
-            "            });" +
-            "        };" +
-            "        " +
             "        // Run the overrides" +
             "        overrideWindowOpen();" +
             "        " +
